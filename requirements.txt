@@ -1,8 +1,7 @@
-streamlit==1.35.0
-streamlit-drawable-canvas==0.9.3
-opencv-python-headless==4.9.0.80
-plotly==5.22.0
-pandas==2.2.2
-numpy==1.26.4
-tensorflow==2.15.0
-keras==3.0.5
+streamlit
+streamlit-drawable-canvas
+opencv-python-headless
+plotly
+pandas
+numpy<2.0.0
+tensorflow
