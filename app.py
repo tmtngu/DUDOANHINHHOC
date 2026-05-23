@@ -70,27 +70,30 @@ CLASS_NAMES = [
     'thatgiac', 'thoi', 'tron', 'vuong'
 ]
 
-# TẢI BỘ NÃO AI .KERAS TỪ COLAB VỀ
+# TẢI BỘ NÃO AI .KERAS - SỬA LỖI INPUTLAYER TỪ KÈM TỪ KHÓA CỦA KERAS 3
 @st.cache_resource
 def load_keras_model():
     try:
         from tensorflow.keras.utils import custom_object_scope
         from tensorflow.keras.layers import Layer
 
-        # Tạo một lớp đệm thông minh để tự động nuốt các từ khóa gây sập hệ thống của Keras 3
+        # Tạo lớp vá thông minh tự động nuốt các tham số lạ gây sập của Keras 3
         class PatchedInputLayer(Layer):
             def __init__(self, *args, **kwargs):
                 kwargs.pop('batch_shape', None)
                 kwargs.pop('optional', None)
                 super().__init__(*args, **kwargs)
 
-        # Ép mô hình nạp vào không gian tùy chỉnh an toàn, loại bỏ xung đột
+        # Nạp mô hình vào không gian an toàn
         with custom_object_scope({'InputLayer': PatchedInputLayer}):
             model = tf.keras.models.load_model("mo_hinh_nhan_dang_hinh_hoc.keras", compile=False)
             
         return model, "⚡ Đã kích hoạt bộ não Deep Learning CNN (.keras) thành công!"
     except Exception as e:
-        return None, f"⚠️ Đang chờ đồng bộ file .keras hoặc lỗi nạp mô hình: {e}"
+        return None, f"⚠️ Đang chờ đồng bộ file hoặc lỗi nạp mô hình: {e}"
+
+# ĐỊNH NGHĨA TRƯỚC KHI GỌI VÀO SIDEBAR ĐỂ TRÁNH LỖI PHÁT SINH BIẾN
+ai_model, status_msg = load_keras_model()
 
 # CẤU HÌNH THANH SIDEBAR TRÁI THEO PHONG CÁCH GỐC
 with st.sidebar:
@@ -109,7 +112,7 @@ with st.sidebar:
 st.markdown("<div class='main-title'>🎯 Nhận dạng hình học vẽ tay Realtime </div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-title'>Nhận diện và phân tích cấu trúc hình học phẳng vẽ tay bằng thuật toán mạng nơ-ron tích chập <b>Convolutional Neural Network (CNN)</b>. Nhập nét vẽ để nhận chẩn đoán từ AI.</div>", unsafe_allow_html=True)
 
-# CHỈ GIỮ LẠI 2 TAB: 1 TAB VẼ VÀ 1 TAB TÀI LIỆU (BỎ HẲN TAB BIỂU ĐỒ BAR)
+# CHỈ GIỮ LẠI 2 TAB: 1 TAB VẼ VÀ 1 TAB TÀI LIỆU
 tab_predict, tab_research = st.tabs([
     "🔮 Bảng Vẽ Hình Học",
     "💡 Tài liệu tham khảo NCKH"
@@ -169,7 +172,7 @@ with tab_predict:
                         predictions = ai_model.predict(img_input, verbose=0)
                         probs = predictions[0]
                     else:
-                        # Chế độ test giả lập nếu chưa kết nối được file .keras
+                        # Chế độ test giả lập bằng phân phối nếu chưa load được model
                         np.random.seed(int(np.mean(img_gray)))
                         probs = np.random.dirichlet(np.ones(len(CLASS_NAMES))*0.1)
                     
@@ -195,7 +198,7 @@ with tab_predict:
                 else:
                     st.info("🖌️ **Hướng dẫn:** Đặt bút quẹt một hình bất kỳ vào ô trắng bên trái, mạng CNN sẽ chẩn đoán Realtime và đưa ra kết quả phân tích lập tức.")
 
-# TAB 2: GIỮ NGUYÊN TOÀN BỘ ĐOẠN VĂN MẪU HỌC THUẬT BẢN GỐC CỦA BẠN
+# TAB 2: TÀI LIỆU VĂN MẪU HỌC THUẬT NCKH
 with tab_research:
     st.markdown("### 💡 Tài Liệu Hỗ Trợ Viết Báo Cáo Khoa Học (NCKH)")
     st.write("Nếu bạn đang dùng ứng dụng này để làm phôi đề tài nghiên cứu, đây là các đoạn văn mẫu học thuật hỗ trợ viết phần Thảo luận (Discussion) & Phương pháp (Methodology):")
