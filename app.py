@@ -34,7 +34,7 @@ CLASS_NAMES = [
 # Hàm tải mô hình AI (Sử dụng bộ nhớ cache để không bị load lại mỗi lần vẽ)
 @st.cache_resource
 def load_my_model():
-    model_path = "mo_hinh_nhan_dang_hinh_hoc.keras"
+    model_path = "mo_hinh_nhan_dang_hinh_hoc.h5"
     if not os.path.exists(model_path):
         return None
     return load_model(model_path)
