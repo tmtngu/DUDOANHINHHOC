@@ -1,3 +1,18 @@
+import subprocess
+import sys
+
+def tu_dong_cai_thu_vien(package_name):
+    try:
+        __import__(package_name.split('-')[0])
+    except ImportError:
+        print(f"📦 Đang ép server tải thư viện: {package_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+
+# Ép hệ thống cài đặt chuẩn xác danh sách phụ tùng cần thiết
+libs = ["streamlit-drawable-canvas", "opencv-python-headless", "tensorflow-cpu", "plotly", "pandas", "numpy"]
+for lib in libs:
+    tu_dong_cai_thu_vien(lib)
+# ======================================================
 import streamlit as st
 import pandas as pd
 import numpy as np

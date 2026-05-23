@@ -1,7 +1,5 @@
 streamlit
 streamlit-drawable-canvas
-opencv-python-headless
-tensorflow-cpu
 plotly
 pandas
 numpy
