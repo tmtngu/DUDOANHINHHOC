@@ -74,12 +74,23 @@ CLASS_NAMES = [
 @st.cache_resource
 def load_keras_model():
     try:
-        model = tf.keras.models.load_model("mo_hinh_nhan_dang_hinh_hoc.keras")
+        from tensorflow.keras.utils import custom_object_scope
+        from tensorflow.keras.layers import Layer
+
+        # Tạo một lớp đệm thông minh để tự động nuốt các từ khóa gây sập hệ thống của Keras 3
+        class PatchedInputLayer(Layer):
+            def __init__(self, *args, **kwargs):
+                kwargs.pop('batch_shape', None)
+                kwargs.pop('optional', None)
+                super().__init__(*args, **kwargs)
+
+        # Ép mô hình nạp vào không gian tùy chỉnh an toàn, loại bỏ xung đột
+        with custom_object_scope({'InputLayer': PatchedInputLayer}):
+            model = tf.keras.models.load_model("mo_hinh_nhan_dang_hinh_hoc.keras", compile=False)
+            
         return model, "⚡ Đã kích hoạt bộ não Deep Learning CNN (.keras) thành công!"
     except Exception as e:
-        return None, f"⚠️ Đang chờ đồng bộ file .keras hoặc đang chạy chế độ kiểm thử hệ thống. (Lỗi: {e})"
-
-ai_model, status_msg = load_keras_model()
+        return None, f"⚠️ Đang chờ đồng bộ file .keras hoặc lỗi nạp mô hình: {e}"
 
 # CẤU HÌNH THANH SIDEBAR TRÁI THEO PHONG CÁCH GỐC
 with st.sidebar:

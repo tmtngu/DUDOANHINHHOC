@@ -1,7 +1,6 @@
 streamlit-drawable-canvas
 opencv-python-headless
-tensorflow>=2.16.1
-keras>=3.0.0
+tensorflow-cpu==2.15.0
 plotly
 pandas
-numpy
+numpy==1.26.4
