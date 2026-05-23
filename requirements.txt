@@ -5,7 +5,3 @@ tensorflow-cpu
 plotly
 pandas
 numpy
-matplotlib
-seaborn
-statsmodels
-scikit-learn
