@@ -1,199 +1,125 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import plotly.express as px
 import cv2
-import tensorflow as tf
+from tensorflow.keras.models import load_model
+from streamlit_drawable_canvas import st_canvas
 
-# ==============================================================================
-# 1. CƠ CHẾ PHÒNG THỦ: ÉP BẢNG VẼ HIỆN LÊN TRƯỚC BẤT CHẤP LỖI THƯ VIỆN
-# ==============================================================================
-try:
-    from streamlit_canvas import st_canvas
-    CANVAS_AVAILABLE = True
-except ImportError:
-    CANVAS_AVAILABLE = False
+# Cấu hình trang
+st.set_page_config(page_title="AI NHẬN DIỆN HÌNH HỌC", page_icon="📐", layout="wide")
 
-st.set_page_config(
-    page_title="NHẬN DIỆN HÌNH HỌC TMT",
-    page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# GIỮ NGUYÊN BỘ CSS GỐC
 st.markdown("""
     <style>
     .main-title { font-size: 2.6rem; font-weight: 700; margin-bottom: 5px; }
-    .sub-title { font-size: 1.1rem; margin-bottom: 25px; }
-    .section-header-center { text-align: center; margin-bottom: 25px; width: 100%; }
+    .sub-title { font-size: 1.1rem; margin-bottom: 25px; color: #666; }
     .custom-green-tag {
         display: inline-block; background-color: #22C55E !important; color: #FFFFFF !important;
         padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 0.95rem;
-        box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); border: none !important;
     }
-    div.stButton { width: 100% !important; }
-    div.stButton > button[kind="primary"] {
-        width: 100% !important; padding: 12px 0px !important; font-size: 1.05rem !important;
-        font-weight: 600 !important; border-radius: 30px !important; border: none !important;
-    }
-    div.stSlider label, div.stPills label, div.stNumberInput label { font-weight: 500; }
     </style>
 """, unsafe_allow_html=True)
 
-# DANH SÁCH TÊN 16 HÌNH ĐỒNG BỘ VỚI COLAB
+# Khai báo 16 nhãn - ĐÃ CẬP NHẬT THEO ĐÚNG THỨ TỰ THƯ MỤC ALPHABET TỪ FOLDER CỦA M
 CLASS_NAMES = [
-    'batgiac', 'binhhanh', 'chunhat', 'cuugiac', 'lucgiac', 'ngugiac', 
-    'nuatron', 'oval', 'sao', 'tamgiac', 'thang', 'thapgiac', 
-    'thatgiac', 'thoi', 'tron', 'vuong'
+    "Hình bát giác (batgiac)", 
+    "Hình bình hành (binhhanh)", 
+    "Hình chữ nhật (chunhat)", 
+    "Hình cửu giác (cuugiac)", 
+    "Hình lục giác (lucgiac)", 
+    "Hình ngũ giác (ngugiac)", 
+    "Hình bán nguyệt (nuatron)", 
+    "Hình oval (oval)",
+    "Hình ngôi sao (sao)", 
+    "Hình tam giác (tamgiac)", 
+    "Hình thang (thang)", 
+    "Hình thập giác (thapgiac)", 
+    "Hình thất giác (thatgiac)", 
+    "Hình thoi (thoi)", 
+    "Hình tròn (tron)", 
+    "Hình vuông (vuong)"
 ]
 
-# ==============================================================================
-# 2. HÀM TẢI BỘ NÃO AI (.KERAS) AN TOÀN - FIX XUNG ĐỘT INPUTLAYER
-# ==============================================================================
+# Tải model (dùng cache để không bị load lại mỗi lần vẽ)
 @st.cache_resource
-def load_keras_model():
-    try:
-        from tensorflow.keras.utils import custom_object_scope
-        from tensorflow.keras.layers import Layer
+def load_ai_model():
+    # ĐÃ CẬP NHẬT TÊN FILE MODEL
+    return load_model("mo_hinh_nhan_dang_hinh_hoc.keras") 
 
-        # Lớp vá thông minh để triệt tiêu các từ khóa gây sập của Keras 3 trên Cloud
-        class PatchedInputLayer(Layer):
-            def __init__(self, *args, **kwargs):
-                kwargs.pop('batch_shape', None)
-                kwargs.pop('optional', None)
-                super().__init__(*args, **kwargs)
+model = load_ai_model()
 
-        with custom_object_scope({'InputLayer': PatchedInputLayer}):
-            model = tf.keras.models.load_model("mo_hinh_nhan_dang_hinh_hoc.keras", compile=False)
-            
-        return model, "⚡ Bộ não Deep Learning Keras (.keras) đã sẵn sàng!"
-    except Exception as e:
-        # Nếu mô hình lỗi, không làm sập giao diện chính mà chỉ báo ở sidebar
-        return None, f"⚠️ Đang cấu hình hoặc lỗi kết nối file .keras: {e}"
+# Header
+st.markdown("<div class='main-title'>📐 AI Nhận Diện 16 Loại Hình Học</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>Vẽ một hình bất kỳ vào khung bên dưới, AI sẽ chẩn đoán real-time.</div>", unsafe_allow_html=True)
 
-# ==============================================================================
-# 3. GIAO DIỆN SIDEBAR NẠP MÔ HÌNH
-# ==============================================================================
-with st.sidebar:
-    st.markdown("<h2 style='text-align: center;'>⚙️ HỆ THỐNG AI</h2>", unsafe_allow_html=True)
-    st.image("https://cdn-icons-png.flaticon.com/512/3112/3112946.png", use_container_width=True)
-    st.markdown("---")
-    st.markdown("### 📊 Thông tin mô hình")
+col1, col2 = st.columns([1, 1], gap="large")
+
+with col1:
+    st.markdown("<div class='custom-green-tag' style='margin-bottom: 15px;'>🖌️ Bảng Vẽ Tương Tác</div>", unsafe_allow_html=True)
     
-    # Gọi nạp mô hình ngay trong sidebar
-    ai_model, status_msg = load_keras_model()
+    # Tạo bảng vẽ
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 255, 255, 1)",  
+        stroke_width=12,                      
+        stroke_color="#FFFFFF",               
+        background_color="#000000",           
+        height=300,
+        width=300,
+        drawing_mode="freedraw",
+        key="canvas",
+    )
+
+with col2:
+    st.markdown("<div class='custom-green-tag' style='margin-bottom: 15px;'>🧠 Kết Quả Từ AI</div>", unsafe_allow_html=True)
     
-    if ai_model is not None:
-        st.success(f"📁 **Trạng thái:**\n{status_msg}")
-    else:
-        st.warning(f"📁 **Trạng thái:**\n{status_msg}")
+    # Xử lý ảnh realtime khi có nét vẽ
+    if canvas_result.image_data is not None:
+        img_array = canvas_result.image_data
         
-    st.info(f"🤖 **Phạm vi nhận diện:**\nĐã học cấu trúc đặc trưng của **{len(CLASS_NAMES)}** hình học phẳng.")
-    st.markdown("---")
-    st.caption("⚡ Giao diện thiết kế tối ưu hóa hệ thống phục vụ NCKH © 2026")
-
-# ==============================================================================
-# 4. GIAO DIỆN CHÍNH & BẢNG VẼ
-# ==============================================================================
-st.markdown("<div class='main-title'>🎯 Nhận dạng hình học vẽ tay Realtime </div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>Nhận diện và phân tích cấu trúc hình học phẳng vẽ tay bằng thuật toán mạng nơ-ron tích chập <b>Convolutional Neural Network (CNN)</b>. Nhập nét vẽ để nhận chẩn đoán từ AI.</div>", unsafe_allow_html=True)
-
-tab_predict, tab_research = st.tabs(["🔮 Bảng Vẽ Hình Học", "💡 Tài liệu tham khảo NCKH"])
-
-with tab_predict:
-    if not CANVAS_AVAILABLE:
-        st.error("⏳ Hệ thống đang cài đặt môi trường vẽ (streamlit-canvas) trên máy chủ Cloud. Vui lòng đợi khoảng 1 phút rồi F5 tải lại trang nhé!")
-    else:
-        st.markdown("### 📝 Thử nghiệm nhận diện cấu trúc nét vẽ")
-        st.write("Vui lòng kéo thanh trượt tùy chỉnh độ dày nét bút và vẽ một hình phẳng khép kín bất kỳ vào ô trống:")
+        # Chuyển RGBA sang Grayscale
+        img_gray = cv2.cvtColor(img_array, cv2.COLOR_RGBA2GRAY)
         
-        col1, col2 = st.columns(2, gap="large")
-
-        with col1:
-            st.markdown("""
-                <div class='section-header-center'>
-                    <div class='custom-green-tag'>🎨 Khung vẽ tương tác (Nét Đen - Nền Trắng)</div>
-                </div>
-            """, unsafe_allow_html=True)
+        # Chỉ dự đoán nếu canvas không trống
+        if np.any(img_gray > 0):
+            # 1. Resize về kích thước model yêu cầu (VD: 28x28)
+            img_resized = cv2.resize(img_gray, (28, 28))
             
-            stroke_width = st.slider("⏱️ Tùy chỉnh độ dày của nét vẽ bút lông:", 4, 15, 8)
+            # 2. Normalize về [0, 1]
+            img_normalized = img_resized.astype('float32') / 255.0
             
-            canvas_result = st_canvas(
-                fill_color="rgba(0,0,0,0)",
-                stroke_width=stroke_width,
-                stroke_color="#000000",      # Vẽ nét màu đen
-                background_color="#FFFFFF",  # Nền màu trắng
-                update_streamlit=True,
-                height=320,
-                width=320,
-                drawing_mode="freedraw",
-                key="canvas_shape_tmt",
+            # 3. Reshape cho khớp model 
+            # --- LƯU Ý DÒNG NÀY ---
+            # NẾU M DÙNG MẠNG DENSE (Multi-Layer Perceptron):
+            img_ready = img_normalized.reshape((1, 28 * 28))
+            
+            # NẾU M DÙNG MẠNG CNN (Conv2D): mở comment dòng dưới và đóng dòng trên lại
+            # img_ready = img_normalized.reshape((1, 28, 28, 1))
+            
+            # 4. Dự đoán
+            preds = model.predict(img_ready)[0]
+            digit = np.argmax(preds)
+            confidence = preds[digit] * 100
+            
+            st.metric(
+                label="🎯 KẾT QUẢ PHÂN TÍCH", 
+                value=f"{CLASS_NAMES[digit]}", 
+                delta=f"Độ tin cậy: {confidence:.2f}%"
             )
-
-        with col2:
-            st.markdown("""
-                <div class='section-header-center'>
-                    <div class='custom-green-tag'>🤖 Kết Quả Đánh Giá Từ Hệ Thống AI</div>
-                </div>
-            """, unsafe_allow_html=True)
             
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Vẽ biểu đồ phân phối xác suất top 5
+            df_preds = pd.DataFrame({
+                'Loại hình': CLASS_NAMES,
+                'Xác suất (%)': preds * 100
+            }).sort_values(by='Xác suất (%)', ascending=True)
             
-            if canvas_result.image_data is not None:
-                img_rgba = canvas_result.image_data
-                img_gray = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2GRAY)
-                
-                # Kiểm tra nếu bảng vẽ có nét (giá trị pixel trung bình nhỏ hơn 254)
-                if np.mean(img_gray) < 254:
-                    if ai_model is not None:
-                        try:
-                            # Tiền xử lý ảnh
-                            img_resized = cv2.resize(img_gray, (64, 64))
-                            img_input = np.expand_dims(img_resized, axis=(0, -1))
-                            img_input = img_input.astype(np.float32)
-                            
-                            # Dự đoán
-                            predictions = ai_model.predict(img_input, verbose=0)
-                            probs = predictions[0]
-                        except Exception as e:
-                            st.error(f"Lỗi khi xử lý ảnh: {e}")
-                            probs = np.ones(len(CLASS_NAMES)) * 0.001 # Tránh lỗi
-                    else:
-                        # Test giả lập nếu model chưa nạp được
-                        np.random.seed(int(np.mean(img_gray)))
-                        probs = np.random.dirichlet(np.ones(len(CLASS_NAMES))*0.1)
-                    
-                    pred_idx = np.argmax(probs)
-                    pred_label = CLASS_NAMES[pred_idx]
-                    confidence = probs[pred_idx] * 100
-                    
-                    # HIỂN THỊ ĐIỂM SỐ
-                    st.metric(label="📊 HÌNH ẢNH ĐƯỢC CHẨN ĐOÁN:", value=f"{pred_label.upper()}")
-                    st.metric(label="🎯 ĐỘ TỰ TIN CỦA THUẬT TOÁN CNN:", value=f"{confidence:.2f} %")
-                    
-                    st.markdown("---")
-                    
-                    # ĐÁNH GIÁ CHẨN ĐOÁN
-                    if confidence >= 80:
-                        st.success(f"🌟 **Cực kỳ xuất sắc!** Đặc trưng rất rõ ràng của hình **{pred_label}**.")
-                    elif confidence >= 50:
-                        st.info(f"👍 **Khá!** Hệ thống dự đoán đây là hình **{pred_label}**.")
-                    elif confidence >= 25:
-                        st.warning(f"⚠️ **Trung bình.** AI đang phân vân, nghiêng về hình **{pred_label}**.")
-                    else:
-                        st.error(f"🚨 **Báo động!** Nét vẽ cực kỳ nguệch ngoạc không thể phân tích rõ.")
-                else:
-                    st.info("🖌️ **Hướng dẫn:** Đặt bút quẹt một hình bất kỳ vào ô trắng bên trái để nhận chẩn đoán Realtime.")
-
-# ==============================================================================
-# 5. TAB TÀI LIỆU (KHÔNG BIỂU ĐỒ)
-# ==============================================================================
-with tab_research:
-    st.markdown("### 💡 Tài Liệu Hỗ Trợ Viết Báo Cáo Khoa Học (NCKH)")
-    st.write("Nếu bạn đang dùng ứng dụng này để làm phôi đề tài nghiên cứu, đây là các đoạn văn mẫu học thuật hỗ trợ viết phần Thảo luận (Discussion) & Phương pháp (Methodology):")
-
-    st.markdown("""
-    > 📌 **Về Thuật Toán (Algorithm Justification):** *Trong nghiên cứu Khai phá Dữ liệu và Thị giác Máy tính (Computer Vision), mô hình Mạng nơ-ron tích chập (CNN) được lựa chọn nhờ khả năng tối ưu trong việc xử lý các mối quan hệ không gian phi tuyến tính phức tạp của nét vẽ tay...*
-
-    > 📌 **Hạn Chế Về Sai Số Nét Vẽ (Limitations & Stroke Bias):** *Dữ liệu tương tác thực tế thông qua bảng vẽ điện tử dạng tự vẽ (Freehand canvas) khó tránh khỏi Định kiến nhiễu do thiết bị ngoại vi (Hardware Jittering Bias)...*
-    """)
+            top_5_df = df_preds.tail(5)
+            
+            fig = px.bar(
+                top_5_df, x='Xác suất (%)', y='Loại hình',
+                orientation='h', text_auto='.1f',
+                color='Xác suất (%)', color_continuous_scale="Blues"
+            )
+            fig.update_layout(xaxis_title="", yaxis_title="", height=250, margin=dict(l=0, r=0, t=0, b=0))
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Hãy vẽ gì đó vào bảng bên trái để AI phân tích nhé!")
