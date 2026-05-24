@@ -31,40 +31,56 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("✨ HỆ THỐNG NHẬN DIỆN HÌNH HỌC AI ✨")
-st.markdown("<p style='text-align: center; font-size:18px;'>Hệ thống Auto-Crop: Tự động loại bỏ lề thừa, khớp 100% với dữ liệu Train!</p>", unsafe_allow_html=True)
+st.title("✨ HỆ THỐNG NHẬN DIỆN HÌNH HỌC AI (V3) ✨")
+st.markdown("<p style='text-align: center; font-size:18px;'>Tích hợp Auto-Crop Bounding Box & Square Padding chống méo hình</p>", unsafe_allow_html=True)
 st.divider()
 
 # ==========================================
-# 2. LOAD MODEL & DANH SÁCH NHÃN
+# 2. LOAD MODEL & DANH SÁCH NHÃN (KHỚP 100% VỚI COLAB)
 # ==========================================
 @st.cache_resource
 def load_ai_model():
-    # NHỚ ĐỔI TÊN FILE SANG BẢN V2 VỪA TRAIN XONG NHÉ
-    return tf.keras.models.load_model("mo_hinh_chuan_version.keras")
+    # Load phiên bản V3 xịn nhất vừa train
+    return tf.keras.models.load_model("model_nhandienhinhhoc_v3.keras")
 
-model = load_ai_model()
+try:
+    model = load_ai_model()
+except Exception as e:
+    st.error(f"⚠️ Lỗi không tìm thấy file mô hình: {e}\n\nÔng nhớ để file 'model_nhandienhinhhoc_v3.keras' chung thư mục với file app.py nhé!")
+    st.stop()
 
+# Danh sách đã được xếp đúng thứ tự Alphabet giống hệt trên thư mục train
 CLASS_NAMES = [
-    "Hình bát giác (8 cạnh)", "Hình bình hành", "Hình chữ nhật",
-    "Hình cửu giác (9 cạnh)", "Hình lục giác (6 cạnh)", "Hình ngũ giác (5 cạnh)",
-    "Hình bán nguyệt (Nửa tròn)", "Hình oval (Bầu dục)", "Hình ngôi sao",
-    "Hình tam giác", "Hình thang", "Hình thập giác (10 cạnh)",
-    "Hình thất giác (7 cạnh)", "Hình thoi", "Hình tròn", "Hình vuông"
+    "Hình bát giác (8 cạnh)",   # batgiac
+    "Hình bình hành",           # binhhanh
+    "Hình chữ nhật",            # chunhat
+    "Hình cửu giác (9 cạnh)",   # cuugiac
+    "Hình lục giác (6 cạnh)",   # lucgiac
+    "Hình ngũ giác (5 cạnh)",   # ngugiac
+    "Hình bán nguyệt",          # nuatron
+    "Hình oval (Bầu dục)",      # oval
+    "Hình ngôi sao",            # sao
+    "Hình tam giác",            # tamgiac
+    "Hình thang",               # thang
+    "Hình thập giác (10 cạnh)", # thapgiac
+    "Hình thất giác (7 cạnh)",  # thatgiac
+    "Hình thoi",                # thoi
+    "Hình tròn",                # tron
+    "Hình vuông"                # vuong
 ]
 
 # ==========================================
-# 3. THIẾT KẾ LAYOUT CHIA CỘT
+# 3. THIẾT KẾ LAYOUT
 # ==========================================
 col1, col2 = st.columns([4, 6], gap="large")
 
 with col1:
     st.subheader("🖍️ Khu vực vẽ")
-    st.caption("Hãy vẽ một hình bất kỳ. Hệ thống sẽ tự động bắt nét và cắt lề.")
+    st.caption("Cứ vẽ thoải mái ở giữa khung, AI sẽ tự động cắt lề và căn chỉnh!")
     
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)", 
-        stroke_width=6, # Giảm nét vẽ xuống xíu để AI dễ nhìn viền sắc cạnh
+        stroke_width=6, 
         stroke_color="#000000", 
         background_color="#FFFFFF", 
         height=300,
@@ -75,14 +91,15 @@ with col1:
 
 with col2:
     st.subheader("🤖 Kết quả phân tích từ AI")
-    st.caption("Bấm nút bên dưới sau khi vẽ xong để hệ thống quét ảnh.")
+    st.caption("Bấm nút bên dưới sau khi vẽ xong.")
     
     if st.button("🚀 XÁC NHẬN VÀ PHÂN TÍCH", use_container_width=True):
         if canvas_result.image_data is not None:
             img_rgba = canvas_result.image_data
             
+            # Kiểm tra xem bảng vẽ có trống không
             if np.all(img_rgba[:, :, 3] == 0):
-                st.warning("⚠️ Bảng vẽ đang trống, m nhớ vẽ hình vào trước khi bấm phân tích nha!")
+                st.warning("⚠️ Bảng vẽ đang trống, ông nhớ vẽ hình vào trước khi bấm phân tích nha!")
             else:
                 with st.spinner("🧠 AI đang căng não phân tích..."):
                     # 1. Chuyển RGBA sang PIL và đổ nền trắng
@@ -93,38 +110,43 @@ with col2:
                     # 2. Chuyển thành Numpy Array dạng Grayscale
                     gray_image = np.array(white_bg.convert("L"))
                     
-                    # --- BẮT ĐẦU THUẬT TOÁN AUTO-CROP ---
-                    # 3. Đảo ngược màu (Trắng thành đen, đen nét vẽ thành trắng) để tìm tọa độ nét vẽ
+                    # --- AUTO-CROP BẢO TOÀN TỶ LỆ ---
+                    # Tìm tọa độ nét vẽ bằng cách đảo màu (đen thành trắng)
                     _, thresh = cv2.threshold(gray_image, 240, 255, cv2.THRESH_BINARY_INV)
-                    
-                    # 4. Tìm tọa độ của tất cả các pixel nét vẽ
                     coords = cv2.findNonZero(thresh)
                     
                     if coords is not None:
-                        # 5. Vẽ một hình chữ nhật bao quanh khít nhất nét vẽ (Bounding Box)
+                        # Vẽ Bounding Box
                         x, y, w, h = cv2.boundingRect(coords)
                         
-                        # Thêm tí lề (padding) 10 pixel xung quanh để hình không bị cắt sát rạt
-                        pad = 10
+                        # Thêm padding nhẹ 15 pixel để viền không chạm sát vách
+                        pad = 15
                         x = max(0, x - pad)
                         y = max(0, y - pad)
                         w = min(gray_image.shape[1] - x, w + 2*pad)
                         h = min(gray_image.shape[0] - y, h + 2*pad)
                         
-                        # 6. CẮT ẢNH: Vứt bỏ phần lề trắng bao la bên ngoài
+                        # Cắt hình
                         cropped_image = gray_image[y:y+h, x:x+w]
                         
-                        # 7. Thu nhỏ cái ảnh đã cắt về đúng 64x64
-                        resized_image = cv2.resize(cropped_image, (64, 64), interpolation=cv2.INTER_AREA)
+                        # Square Padding: Tạo khung vuông màu trắng bằng với cạnh dài nhất
+                        max_side = max(w, h)
+                        square_img = np.full((max_side, max_side), 255, dtype=np.uint8)
+                        
+                        # Dán hình vừa cắt vào chính giữa khung vuông
+                        offset_x = (max_side - w) // 2
+                        offset_y = (max_side - h) // 2
+                        square_img[offset_y:offset_y+h, offset_x:offset_x+w] = cropped_image
+                        
+                        # Resize khung vuông về 64x64
+                        resized_image = cv2.resize(square_img, (64, 64), interpolation=cv2.INTER_AREA)
                     else:
-                        # Backup lỡ thuật toán không tìm thấy viền thì xài ảnh gốc
                         resized_image = cv2.resize(gray_image, (64, 64), interpolation=cv2.INTER_AREA)
-                    # --- KẾT THÚC AUTO-CROP ---
-
-                    # 8. Định dạng lại Tensor để truyền vào model (KHÔNG chia 255 nữa vì model V2 đã tự lo)
+                    
+                    # KHÔNG CHIA 255 (Vì Model V3 đã có layers.Rescaling)
                     input_tensor = np.expand_dims(resized_image, axis=[0, -1])
 
-                    # 9. Đẩy vào Model dự đoán
+                    # Dự đoán
                     predictions = model.predict(input_tensor)[0]
                     
                     top_1_idx = np.argmax(predictions)
@@ -134,10 +156,10 @@ with col2:
                 st.success(f"🎉 Đây chắc chắn là: **{CLASS_NAMES[top_1_idx]}**")
                 st.metric(label="Độ tự tin của AI", value=f"{top_1_score:.2f}%")
                 
-                if top_1_score >= 70.0:
+                if top_1_score >= 80.0:
                     st.balloons()
                 
-                st.markdown("#### 📊 Phân tích chuyên sâu (Top 3):")
+                st.markdown("#### 📊 Phân tích chuyên sâu (Top 3 khả năng):")
                 top_3_indices = np.argsort(predictions)[-3:][::-1]
                 
                 for idx in top_3_indices:
@@ -156,9 +178,9 @@ with st.sidebar:
     st.markdown("""
     1. Dùng chuột vẽ hình vào bảng trắng bên trái.
     2. Vẽ xong bấm **Phân tích**.
-    3. Hệ thống sẽ tự động căn chỉnh tỷ lệ và làm phần việc còn lại.
+    3. Hệ thống sẽ tự động căn chỉnh, cắt lề tỷ lệ vàng.
     4. Bấm biểu tượng 🗑️ ở bảng vẽ để xóa và vẽ lại.
     """)
     st.divider()
-    st.caption("🧠 Mô hình: CNN Deep Learning (Auto-Normalized)")
-    st.caption("🔧 Tích hợp AI Auto-Crop bằng OpenCV")
+    st.caption("🧠 Mô hình: CNN Deep Learning V3")
+    st.caption("🔧 Tích hợp Auto-Crop & Square Padding")
