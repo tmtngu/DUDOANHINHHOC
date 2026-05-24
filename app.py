@@ -10,7 +10,6 @@ from PIL import Image
 # ==========================================
 st.set_page_config(page_title="AI Nhận Diện Hình Học", page_icon="📐", layout="wide")
 
-# Thêm CSS để làm nút bấm và layout lấp lánh hơn
 st.markdown("""
     <style>
     .stButton>button {
@@ -33,7 +32,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("✨ HỆ THỐNG NHẬN DIỆN HÌNH HỌC AI ✨")
-st.markdown("<p style='text-align: center; font-size:18px;'>Vẽ một hình học cơ bản vào bảng bên dưới, Trí tuệ nhân tạo sẽ phân tích nét vẽ của bạn!</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size:18px;'>Hệ thống Auto-Crop: Tự động loại bỏ lề thừa, khớp 100% với dữ liệu Train!</p>", unsafe_allow_html=True)
 st.divider()
 
 # ==========================================
@@ -41,8 +40,8 @@ st.divider()
 # ==========================================
 @st.cache_resource
 def load_ai_model():
-    # Load file mô hình vào bộ nhớ tạm để web chạy nhanh
-    return tf.keras.models.load_model("mo_hinh_chuan_version.keras")
+    # NHỚ ĐỔI TÊN FILE SANG BẢN V2 VỪA TRAIN XONG NHÉ
+    return tf.keras.models.load_model("mo_hinh_chuan_version_v2.keras")
 
 model = load_ai_model()
 
@@ -55,20 +54,19 @@ CLASS_NAMES = [
 ]
 
 # ==========================================
-# 3. THIẾT KẾ LAYOUT CHIA CỘT (CANVAS & KẾT QUẢ)
+# 3. THIẾT KẾ LAYOUT CHIA CỘT
 # ==========================================
 col1, col2 = st.columns([4, 6], gap="large")
 
 with col1:
     st.subheader("🖍️ Khu vực vẽ")
-    st.caption("Hãy vẽ hình to, liền mạch và nằm gọn ở giữa khung trắng.")
+    st.caption("Hãy vẽ một hình bất kỳ. Hệ thống sẽ tự động bắt nét và cắt lề.")
     
-    # Tạo bảng vẽ (Đã tăng stroke_width lên 8 để giữ nét khi thu nhỏ)
     canvas_result = st_canvas(
-        fill_color="rgba(255, 255, 255, 0)", # Nền trong suốt lúc vẽ
-        stroke_width=8, # Nét vẽ đậm hơn để AI dễ nhìn
-        stroke_color="#000000", # Nét vẽ màu đen
-        background_color="#FFFFFF", # Nền bảng trắng
+        fill_color="rgba(255, 255, 255, 0)", 
+        stroke_width=6, # Giảm nét vẽ xuống xíu để AI dễ nhìn viền sắc cạnh
+        stroke_color="#000000", 
+        background_color="#FFFFFF", 
         height=300,
         width=300,
         drawing_mode="freedraw",
@@ -83,48 +81,62 @@ with col2:
         if canvas_result.image_data is not None:
             img_rgba = canvas_result.image_data
             
-            # Kiểm tra xem m có vẽ gì chưa (Kiểm tra kênh Alpha)
             if np.all(img_rgba[:, :, 3] == 0):
                 st.warning("⚠️ Bảng vẽ đang trống, m nhớ vẽ hình vào trước khi bấm phân tích nha!")
             else:
                 with st.spinner("🧠 AI đang căng não phân tích..."):
-                    # --- BẮT ĐẦU QUÁ TRÌNH TIỀN XỬ LÝ ẢNH CHUẨN MỰC ---
-                    
-                    # 1. Chuyển ma trận Numpy sang dạng ảnh PIL
+                    # 1. Chuyển RGBA sang PIL và đổ nền trắng
                     img_pil = Image.fromarray(img_rgba.astype('uint8'), 'RGBA')
-                    
-                    # 2. Tạo một lớp nền trắng bóc
                     white_bg = Image.new("RGB", img_pil.size, (255, 255, 255))
-                    
-                    # 3. Dán nét vẽ lên nền trắng (Sử dụng kênh Alpha làm mặt nạ) -> XÓA SẠCH LỖI NỀN ĐEN!
                     white_bg.paste(img_pil, mask=img_pil.split()[3])
                     
-                    # 4. Chuyển thành ảnh xám (Grayscale)
-                    gray_image = white_bg.convert("L")
+                    # 2. Chuyển thành Numpy Array dạng Grayscale
+                    gray_image = np.array(white_bg.convert("L"))
                     
-                    # 5. Ép lại thành Numpy Array và thu nhỏ về 64x64 (Dùng INTER_AREA giữ nét cực tốt)
-                    gray_array = np.array(gray_image)
-                    resized_image = cv2.resize(gray_array, (64, 64), interpolation=cv2.INTER_AREA)
+                    # --- BẮT ĐẦU THUẬT TOÁN AUTO-CROP ---
+                    # 3. Đảo ngược màu (Trắng thành đen, đen nét vẽ thành trắng) để tìm tọa độ nét vẽ
+                    _, thresh = cv2.threshold(gray_image, 240, 255, cv2.THRESH_BINARY_INV)
                     
-                    # 6. Chuẩn hóa Pixel về [0, 1] và Reshape
-                    normalized_image = resized_image / 255.0
-                    input_tensor = np.expand_dims(normalized_image, axis=[0, -1])
+                    # 4. Tìm tọa độ của tất cả các pixel nét vẽ
+                    coords = cv2.findNonZero(thresh)
+                    
+                    if coords is not None:
+                        # 5. Vẽ một hình chữ nhật bao quanh khít nhất nét vẽ (Bounding Box)
+                        x, y, w, h = cv2.boundingRect(coords)
+                        
+                        # Thêm tí lề (padding) 10 pixel xung quanh để hình không bị cắt sát rạt
+                        pad = 10
+                        x = max(0, x - pad)
+                        y = max(0, y - pad)
+                        w = min(gray_image.shape[1] - x, w + 2*pad)
+                        h = min(gray_image.shape[0] - y, h + 2*pad)
+                        
+                        # 6. CẮT ẢNH: Vứt bỏ phần lề trắng bao la bên ngoài
+                        cropped_image = gray_image[y:y+h, x:x+w]
+                        
+                        # 7. Thu nhỏ cái ảnh đã cắt về đúng 64x64
+                        resized_image = cv2.resize(cropped_image, (64, 64), interpolation=cv2.INTER_AREA)
+                    else:
+                        # Backup lỡ thuật toán không tìm thấy viền thì xài ảnh gốc
+                        resized_image = cv2.resize(gray_image, (64, 64), interpolation=cv2.INTER_AREA)
+                    # --- KẾT THÚC AUTO-CROP ---
 
-                    # --- AI BẮT ĐẦU ĐOÁN ---
+                    # 8. Định dạng lại Tensor để truyền vào model (KHÔNG chia 255 nữa vì model V2 đã tự lo)
+                    input_tensor = np.expand_dims(resized_image, axis=[0, -1])
+
+                    # 9. Đẩy vào Model dự đoán
                     predictions = model.predict(input_tensor)[0]
                     
                     top_1_idx = np.argmax(predictions)
                     top_1_score = predictions[top_1_idx] * 100
                     
-                # Hiển thị vinh danh kết quả cao nhất
+                # Hiển thị kết quả
                 st.success(f"🎉 Đây chắc chắn là: **{CLASS_NAMES[top_1_idx]}**")
                 st.metric(label="Độ tự tin của AI", value=f"{top_1_score:.2f}%")
                 
-                # Hiệu ứng nổ bóng bay nếu AI tự tin trên 80%
-                if top_1_score >= 80.0:
+                if top_1_score >= 70.0:
                     st.balloons()
                 
-                # Bonus: Vẽ thanh Progress Bar cho Top 3 dự đoán gần giống nhất
                 st.markdown("#### 📊 Phân tích chuyên sâu (Top 3):")
                 top_3_indices = np.argsort(predictions)[-3:][::-1]
                 
@@ -143,11 +155,10 @@ with st.sidebar:
     st.header("💡 Hướng dẫn sử dụng")
     st.markdown("""
     1. Dùng chuột vẽ hình vào bảng trắng bên trái.
-    2. Cố gắng vẽ hình **to**, **cân đối** ở giữa khung.
-    3. Vẽ xong bấm **Phân tích**.
+    2. Vẽ xong bấm **Phân tích**.
+    3. Hệ thống sẽ tự động căn chỉnh tỷ lệ và làm phần việc còn lại.
     4. Bấm biểu tượng 🗑️ ở bảng vẽ để xóa và vẽ lại.
     """)
     st.divider()
-    st.caption("🧠 Mô hình: Convolutional Neural Network (CNN) - 30 Epochs")
-    st.caption("🔧 Hệ sinh thái: TensorFlow & Keras")
-    st.caption("✨ Cập nhật: Khắc phục lỗi nền Alpha & Tối ưu nét vẽ")
+    st.caption("🧠 Mô hình: CNN Deep Learning (Auto-Normalized)")
+    st.caption("🔧 Tích hợp AI Auto-Crop bằng OpenCV")
