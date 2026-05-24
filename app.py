@@ -80,7 +80,7 @@ with col1:
     
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)", 
-        stroke_width=6, 
+        stroke_width=2, 
         stroke_color="#000000", 
         background_color="#FFFFFF", 
         height=300,
