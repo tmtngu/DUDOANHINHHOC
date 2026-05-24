@@ -81,7 +81,7 @@ with col1:
     # Set nét bút nhỏ (stroke_width=3) để giống với data train
     canvas_result = st_canvas(
         fill_color="rgba(255, 255, 255, 0)", 
-        stroke_width=3, 
+        stroke_width=1, 
         stroke_color="#000000", 
         background_color="#FFFFFF", 
         height=300,
