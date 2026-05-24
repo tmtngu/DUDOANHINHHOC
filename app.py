@@ -41,7 +41,7 @@ st.divider()
 @st.cache_resource
 def load_ai_model():
     # NHỚ ĐỔI TÊN FILE SANG BẢN V2 VỪA TRAIN XONG NHÉ
-    return tf.keras.models.load_model("mo_hinh_chuan_version_v2.keras")
+    return tf.keras.models.load_model("mo_hinh_chuan_version.keras")
 
 model = load_ai_model()
 
