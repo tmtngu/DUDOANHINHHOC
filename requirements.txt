@@ -1,7 +1,7 @@
-streamlit==1.31.0
-streamlit-drawable-canvas==0.9.3
-tensorflow==2.21.0
-keras==3.12.2
+streamlit
+streamlit-drawable-canvas
+tensorflow
+keras
 numpy
 pillow
 opencv-python-headless
