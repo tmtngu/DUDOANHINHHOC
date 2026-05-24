@@ -10,7 +10,7 @@ import io
 # CẤU HÌNH API KEY (TÀ ĐẠO)
 # ==========================================
 # 🛑 ÔNG ĐIỀN API KEY CỦA ÔNG VÀO GIỮA DẤU NHÁY DƯỚI ĐÂY NHÉ:
-GEMINI_API_KEY = "AIzaSyD9lNOyiooV48F4EIXz7cWVAlOrSEANirQ"
+GEMINI_API_KEY = "AIzaSyADdHc9E2tWey279Cs34_ltdIxzDepJmyI"
 
 # ==========================================
 # 1. CẤU HÌNH GIAO DIỆN ỨNG DỤNG
