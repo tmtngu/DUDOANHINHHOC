@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import pandas as pd
 import plotly.express as px
+import time # Thư viện tạo hiệu ứng trễ cho AI
 
 # 1. CẤU HÌNH TRANG VÀ CSS
 st.set_page_config(
@@ -30,11 +31,31 @@ st.markdown("""
         padding: 8px 24px; border-radius: 30px; font-weight: 600; font-size: 0.95rem;
         box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); border: none !important;
     }
+    div.stButton {
+        width: 100% !important;
+    }
+    div.stButton > button[kind="primary"] {
+        width: 100% !important;
+        padding: 12px 0px !important;
+        font-size: 1.05rem !important;
+        font-weight: 600 !important;
+        border-radius: 30px !important;
+        border: none !important;
+        background-color: #22C55E !important;
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+    }
     </style>
 """, unsafe_allow_html=True)
 
+# KHOI TẠO BỘ NHỚ LƯU TRỮ KẾT QUẢ (SESSION STATE)
+if 'prediction_data' not in st.session_state:
+    st.session_state.prediction_data = None
+if 'predicted_class' not in st.session_state:
+    st.session_state.predicted_class = None
+if 'max_prob' not in st.session_state:
+    st.session_state.max_prob = None
+
 # 2. LOAD MODEL & DATA
-# ĐÃ FIX: Sắp xếp theo A-Z chuẩn thư mục của ông: binhhanh, chunhat, sao, tamgiac, thang, tron, vuong
 CLASSES = ['Bình Hành', 'Chữ Nhật', 'Ngôi Sao', 'Tam Giác', 'Hình Thang', 'Hình Tròn', 'Hình Vuông']
 
 @st.cache_resource
@@ -74,12 +95,9 @@ tab_predict, tab_analytics, tab_research = st.tabs([
     "💡 Tài Liệu Kỹ Thuật"
 ])
 
-# BIẾN TOÀN CỤC ĐỂ LƯU KẾT QUẢ CHO TAB 2
-prediction_data = None
-
 # TAB 1: BẢNG VẼ
 with tab_predict:
-    st.write("Vui lòng vẽ một hình khối bất kỳ vào bảng bên dưới, AI sẽ tự động phân tích và đưa ra kết quả:")
+    st.write("Vui lòng vẽ một hình khối bất kỳ vào bảng bên dưới, sau đó bấm nút để kích hoạt AI nhận diện:")
     
     col1, col2 = st.columns([1.5, 1], gap="large")
 
@@ -96,10 +114,11 @@ with tab_predict:
             height=400, width=600, 
             drawing_mode="freedraw", key="canvas_shape"
         )
+        st.caption("💡 Mẹo: Vẽ nét liền và khép kín, sau đó nhấn nút bên dưới để chẩn đoán.")
         
-        col_btn1, col_btn2 = st.columns([1, 1])
-        with col_btn1:
-            st.caption("💡 Mẹo: Vẽ nét liền và khép kín để AI nhận diện tốt nhất.")
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Nút bấm kích hoạt mô hình giống hệt bên App GPA của ông
+        chay_mo_hinh = st.button("🚀 KÍCH HOẠT AI NHẬN DIỆN HÌNH VẼ", type="primary", use_container_width=True)
 
     with col2:
         st.markdown("""
@@ -108,57 +127,68 @@ with tab_predict:
             </div>
         """, unsafe_allow_html=True)
         
-        if canvas_result.image_data is not None and model is not None:
-            img = cv2.cvtColor(canvas_result.image_data, cv2.COLOR_RGBA2GRAY)
-            
-            if np.any(img < 255): 
-                # Cắt khoảng trắng thừa
-                pts = np.argwhere(img < 255)
-                y_min, x_min = pts[:,0].min(), pts[:,1].min()
-                y_max, x_max = pts[:,0].max(), pts[:,1].max()
-                cropped = img[y_min:y_max+1, x_min:x_max+1]
+        # Xử lý sự kiện khi bấm nút
+        if chay_mo_hinh:
+            if canvas_result.image_data is not None and model is not None:
+                img = cv2.cvtColor(canvas_result.image_data, cv2.COLOR_RGBA2GRAY)
                 
-                # Padding thành hình vuông
-                h, w = cropped.shape
-                side = max(h, w) + 40
-                pad = np.ones((side, side), dtype=np.uint8) * 255
-                pad[(side-h)//2:(side-h)//2+h, (side-w)//2:(side-w)//2+w] = cropped
-                
-                # Resize về chuẩn 224x224 cho AI
-                input_img = cv2.resize(pad, (224, 224))
-                input_img_rgb = cv2.cvtColor(input_img, cv2.COLOR_GRAY2RGB)
-                
-                # Dự đoán
-                pred = model.predict(np.expand_dims(input_img_rgb, axis=0), verbose=0)[0]
-                idx = np.argmax(pred)
-                max_prob = pred[idx] * 100
-                
-                # Lưu data cho Tab 2
-                prediction_data = pd.DataFrame({
-                    'Hình khối': CLASSES,
-                    'Xác suất (%)': pred * 100
-                }).sort_values(by='Xác suất (%)', ascending=True)
-
-                # Hiển thị kết quả
-                st.metric(label="DỰ ĐOÁN HÌNH DÁNG", value=CLASSES[idx], delta=f"Độ tin cậy: {max_prob:.2f}%")
-                
-                if max_prob >= 90:
-                    st.success("🌟 **Cực kỳ rõ ràng!** Nét vẽ rất chuẩn xác, AI không hề do dự khi nhận diện hình này.")
-                elif max_prob >= 60:
-                    st.warning("⚠️ **Có chút phân vân.** Hình vẽ hơi méo hoặc giống với một hình khác. Hãy kiểm tra biểu đồ xác suất ở Tab 2 nhé.")
+                if np.any(img < 255): 
+                    # Hiệu ứng loading xoay tròn quét ma trận
+                    with st.spinner("🔮 AI đang quét các đường nét và trích xuất ma trận điểm ảnh..."):
+                        time.sleep(0.8) # Tạo độ trễ ảo nhìn cho giống đang tính toán phức tạp
+                        
+                        # Tiền xử lý hình ảnh
+                        pts = np.argwhere(img < 255)
+                        y_min, x_min = pts[:,0].min(), pts[:,1].min()
+                        y_max, x_max = pts[:,0].max(), pts[:,1].max()
+                        cropped = img[y_min:y_max+1, x_min:x_max+1]
+                        
+                        h, w = cropped.shape
+                        side = max(h, w) + 40
+                        pad = np.ones((side, side), dtype=np.uint8) * 255
+                        pad[(side-h)//2:(side-h)//2+h, (side-w)//2:(side-w)//2+w] = cropped
+                        
+                        input_img = cv2.resize(pad, (224, 224))
+                        input_img_rgb = cv2.cvtColor(input_img, cv2.COLOR_GRAY2RGB)
+                        
+                        # Dự đoán kết quả
+                        pred = model.predict(np.expand_dims(input_img_rgb, axis=0), verbose=0)[0]
+                        idx = np.argmax(pred)
+                        
+                        # Lưu thông tin vào bộ nhớ Session State
+                        st.session_state.max_prob = pred[idx] * 100
+                        st.session_state.predicted_class = CLASSES[idx]
+                        st.session_state.prediction_data = pd.DataFrame({
+                            'Hình khối': CLASSES,
+                            'Xác suất (%)': pred * 100
+                        }).sort_values(by='Xác suất (%)', ascending=True)
                 else:
-                    st.error("🚨 **Khó nhận diện!** Nét vẽ quá rối hoặc không nằm trong tập dữ liệu 7 hình cơ bản. Thử vẽ lại rõ nét hơn xem sao.")
+                    st.session_state.predicted_class = "Empty"
+                    st.session_state.prediction_data = None
+
+        # Hiển thị kết quả từ Bộ nhớ (Session State) ra màn hình
+        if st.session_state.predicted_class and st.session_state.predicted_class != "Empty":
+            st.metric(label="DỰ ĐOÁN HÌNH DÁNG", value=st.session_state.predicted_class, delta=f"Độ tin cậy: {st.session_state.max_prob:.2f}%")
+            
+            if st.session_state.max_prob >= 90:
+                st.success("🌟 **Cực kỳ rõ ràng!** Nét vẽ rất chuẩn xác, AI không hề do dự khi nhận diện hình này.")
+            elif st.session_state.max_prob >= 60:
+                st.warning("⚠️ **Có chút phân vân.** Hình vẽ hơi méo hoặc gần giống với một hình khác. Hãy kiểm tra biểu đồ xác suất ở Tab 2 nhé.")
             else:
-                st.info("👈 Bảng đang trống. Hãy múa chuột vẽ gì đó đi!")
+                st.error("🚨 **Khó nhận diện!** Nét vẽ quá rối hoặc thiếu đặc trưng hình học cơ bản. Thử vẽ lại rõ nét hơn xem sao.")
+        elif st.session_state.predicted_class == "Empty":
+            st.info("👈 Bảng đang trống! Vui lòng vẽ gì đó trước khi bấm nút phân tích.")
+        else:
+            st.info("👈 Hãy múa chuột vẽ hình, sau đó nhấn nút màu xanh bên dưới để AI hiển thị chẩn đoán tại đây!")
 
 # TAB 2: BIỂU ĐỒ XÁC SUẤT
 with tab_analytics:
     st.markdown("### 📊 Mức Độ Tự Tin Của Thuật Toán (Confidence Logic)")
     st.write("Biểu đồ này bóc tách thuật toán bên trong, cho thấy AI đang đánh giá xác suất hình vẽ của bạn thuộc về lớp (class) nào cao nhất.")
 
-    if prediction_data is not None:
+    if st.session_state.prediction_data is not None:
         fig = px.bar(
-            prediction_data,
+            st.session_state.prediction_data,
             x='Xác suất (%)',
             y='Hình khối',
             orientation='h',
@@ -177,11 +207,11 @@ with tab_analytics:
         
         with st.expander("🔍 Xem mảng xác suất thô (Raw Array)"):
             st.dataframe(
-                prediction_data.sort_values(by='Xác suất (%)', ascending=False), 
+                st.session_state.prediction_data.sort_values(by='Xác suất (%)', ascending=False), 
                 use_container_width=True
             )
     else:
-        st.info("Vui lòng vẽ hình ở Tab 'Bảng Vẽ Nhận Diện' để xem phân tích biểu đồ.")
+        st.info("Vui lòng vẽ hình và nhấn nút ở Tab 'Bảng Vẽ Nhận Diện' để xem phân tích biểu đồ.")
 
 # TAB 3: TÀI LIỆU
 with tab_research:
