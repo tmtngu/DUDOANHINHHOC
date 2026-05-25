@@ -34,8 +34,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. LOAD MODEL & DATA
-# Danh sách 7 hình chuẩn theo thứ tự A-Z
-CLASSES = ['Bình Hành', 'Chữ Nhật', 'Ngôi Sao', 'Tam Giác', 'Đường Thẳng', 'Hình Tròn', 'Hình Vuông']
+# ĐÃ FIX: Sắp xếp theo A-Z chuẩn thư mục của ông: binhhanh, chunhat, sao, tamgiac, thang, tron, vuong
+CLASSES = ['Bình Hành', 'Chữ Nhật', 'Ngôi Sao', 'Tam Giác', 'Hình Thang', 'Hình Tròn', 'Hình Vuông']
 
 @st.cache_resource
 def load_ai_model():
@@ -90,7 +90,6 @@ with tab_predict:
             </div>
         """, unsafe_allow_html=True)
         
-        # Đã fix lỗi bảng vẽ nhỏ xíu: width=600
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 1)", stroke_width=8,
             stroke_color="#000000", background_color="#FFFFFF",
@@ -177,7 +176,6 @@ with tab_analytics:
         st.plotly_chart(fig, use_container_width=True)
         
         with st.expander("🔍 Xem mảng xác suất thô (Raw Array)"):
-            # Đã fix lỗi ImportError (Bỏ style tô màu nền)
             st.dataframe(
                 prediction_data.sort_values(by='Xác suất (%)', ascending=False), 
                 use_container_width=True
