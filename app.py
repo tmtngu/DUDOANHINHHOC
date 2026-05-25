@@ -6,7 +6,7 @@ import cv2
 import pandas as pd
 import plotly.express as px
 
-# 1. CẤU HÌNH TRANG VÀ CSS (Chuẩn Form ông đưa)
+# 1. CẤU HÌNH TRANG VÀ CSS
 st.set_page_config(
     page_title="DỰ ĐOÁN HÌNH HỌC AI",
     page_icon="📐",
@@ -34,6 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. LOAD MODEL & DATA
+# Danh sách 7 hình chuẩn theo thứ tự A-Z
 CLASSES = ['Bình Hành', 'Chữ Nhật', 'Ngôi Sao', 'Tam Giác', 'Đường Thẳng', 'Hình Tròn', 'Hình Vuông']
 
 @st.cache_resource
@@ -50,7 +51,7 @@ model, model_status = load_ai_model()
 # 3. SIDEBAR
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>⚙️ HỆ THỐNG AI</h2>", unsafe_allow_html=True)
-    st.image("https://cdn-icons-png.flaticon.com/512/2103/2103130.png", use_container_width=True) # Đổi icon AI hình học
+    st.image("https://cdn-icons-png.flaticon.com/512/2103/2103130.png", use_container_width=True) 
     st.markdown("---")
     st.markdown("### 📊 Thông tin Mô hình")
     st.info("📁 **Dữ liệu huấn luyện:**\n10,500 mẫu (500x3 mỗi class)")
@@ -89,11 +90,11 @@ with tab_predict:
             </div>
         """, unsafe_allow_html=True)
         
-        # Tạo canvas
+        # Đã fix lỗi bảng vẽ nhỏ xíu: width=600
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 1)", stroke_width=8,
             stroke_color="#000000", background_color="#FFFFFF",
-            height=400, width=100, # width 100% của cột
+            height=400, width=600, 
             drawing_mode="freedraw", key="canvas_shape"
         )
         
@@ -111,22 +112,24 @@ with tab_predict:
         if canvas_result.image_data is not None and model is not None:
             img = cv2.cvtColor(canvas_result.image_data, cv2.COLOR_RGBA2GRAY)
             
-            if np.any(img < 255): # Có nét vẽ
-                # Preprocessing ảnh (Cắt và đưa về 224x224)
+            if np.any(img < 255): 
+                # Cắt khoảng trắng thừa
                 pts = np.argwhere(img < 255)
                 y_min, x_min = pts[:,0].min(), pts[:,1].min()
                 y_max, x_max = pts[:,0].max(), pts[:,1].max()
                 cropped = img[y_min:y_max+1, x_min:x_max+1]
                 
+                # Padding thành hình vuông
                 h, w = cropped.shape
                 side = max(h, w) + 40
                 pad = np.ones((side, side), dtype=np.uint8) * 255
                 pad[(side-h)//2:(side-h)//2+h, (side-w)//2:(side-w)//2+w] = cropped
                 
+                # Resize về chuẩn 224x224 cho AI
                 input_img = cv2.resize(pad, (224, 224))
                 input_img_rgb = cv2.cvtColor(input_img, cv2.COLOR_GRAY2RGB)
                 
-                # Predict
+                # Dự đoán
                 pred = model.predict(np.expand_dims(input_img_rgb, axis=0), verbose=0)[0]
                 idx = np.argmax(pred)
                 max_prob = pred[idx] * 100
@@ -137,10 +140,9 @@ with tab_predict:
                     'Xác suất (%)': pred * 100
                 }).sort_values(by='Xác suất (%)', ascending=True)
 
-                # Hiển thị Metric
+                # Hiển thị kết quả
                 st.metric(label="DỰ ĐOÁN HÌNH DÁNG", value=CLASSES[idx], delta=f"Độ tin cậy: {max_prob:.2f}%")
                 
-                # Đánh giá độ tin cậy
                 if max_prob >= 90:
                     st.success("🌟 **Cực kỳ rõ ràng!** Nét vẽ rất chuẩn xác, AI không hề do dự khi nhận diện hình này.")
                 elif max_prob >= 60:
@@ -163,7 +165,7 @@ with tab_analytics:
             orientation='h',
             text_auto='.2f',
             color='Xác suất (%)',
-            color_continuous_scale=px.colors.sequential.Greens # Tone xanh lá cho hợp UI
+            color_continuous_scale=px.colors.sequential.Greens 
         )
         fig.update_layout(
             xaxis_title="Xác suất dự đoán (%)",
@@ -175,9 +177,9 @@ with tab_analytics:
         st.plotly_chart(fig, use_container_width=True)
         
         with st.expander("🔍 Xem mảng xác suất thô (Raw Array)"):
+            # Đã fix lỗi ImportError (Bỏ style tô màu nền)
             st.dataframe(
-                prediction_data.sort_values(by='Xác suất (%)', ascending=False)
-                .style.background_gradient(cmap='Greens'), 
+                prediction_data.sort_values(by='Xác suất (%)', ascending=False), 
                 use_container_width=True
             )
     else:
