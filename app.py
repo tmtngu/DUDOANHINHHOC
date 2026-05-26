@@ -63,7 +63,7 @@ CLASSES = ['Bình Hành', 'Chữ Nhật', 'Ngôi Sao', 'Tam Giác', 'Hình Thang
 def load_ai_model():
     try:
         model = tf.keras.models.load_model('filetrain.keras')
-        status = "Đã sẵn sàng!"
+        status = "Trực tuyến (Sẵn sàng)"
         return model, status
     except:
         return None,"Không có file train"
