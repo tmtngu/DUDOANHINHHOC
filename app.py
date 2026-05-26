@@ -18,11 +18,6 @@ st.markdown("""
     .main-title {
         font-size: 2.6rem; font-weight: 700; margin-bottom: 5px;
     }
-    iframe[title="streamlit_drawable_canvas.st_canvas"] {
-    background-color: #FFFFFF !important;
-    border-radius: 8px;
-    padding: 4px;
-    }
     .sub-title {
         font-size: 1.1rem; margin-bottom: 25px; color: #555;
     }
@@ -47,6 +42,12 @@ st.markdown("""
         background-color: #22C55E !important;
         box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
     }
+    iframe[title="streamlit_drawable_canvas.st_canvas"] {
+        background-color: #FFFFFF !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+}
     </style>
 """, unsafe_allow_html=True)
 
