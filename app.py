@@ -70,8 +70,6 @@ def load_ai_model():
         return None,"Không có file train"
 
 model, model_status = load_ai_model()
-
-# 3. SIDEBAR
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>⚙️ DỰ ĐOÁN HÌNH HỌC</h2>", unsafe_allow_html=True)
     st.image("https://i.ibb.co/Pv12Q70D/Thumb-Luoc-su.jpg", use_container_width=True) 
@@ -85,19 +83,13 @@ with st.sidebar:
     
     st.markdown("---")
     st.caption("⚡ Thiết kế nhằm mục đích áp dụng kiến thức đã được học ở trường © 2026")
-
-# 4. HEADER
 st.markdown("<div class='main-title'>🎯 Nhận Diện Hình Học Thông Minh </div>", unsafe_allow_html=True)
 st.markdown("<div class='sub-title'>Ứng dụng mạng nơ-ron tích chập (CNN) để phân loại 7 hình học cơ bản.</div>", unsafe_allow_html=True)
-
-# 5. TABS
 tab_predict, tab_analytics, tab_research = st.tabs([
     "🎨 Bảng Vẽ ",
     "📈 Tỉ lệ dự đoán",
     "💡 Thông Tin Kỹ Thuật"
 ])
-
-# TAB 1: BẢNG VẼ
 with tab_predict:
     st.write("Vẽ một trong 7 hình (Tròn, Sao, Chữ Nhật, Bình Hành, Vuông, Tam Giác, Thang) vào bảng bên dưới, sau đó bấm nút để kích hoạt AI nhận diện:")
     
@@ -109,7 +101,6 @@ with tab_predict:
                 <div class='custom-green-tag'>✏️ Bảng vẽ</div>
             </div>
         """, unsafe_allow_html=True)
-        
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 1)", stroke_width=8,
             stroke_color="#000000", background_color="#FFFFFF",
@@ -119,7 +110,6 @@ with tab_predict:
         st.caption("💡 Mẹo: Vẽ nét liền và khép kín, sau đó nhấn nút bên dưới để đoán.")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        # Nút bấm kích hoạt mô hình giống hệt bên App GPA của ông
         chay_mo_hinh = st.button("🚀 NHẤN ĐỂ DỰ ĐOÁN HÌNH HỌC", type="primary", use_container_width=True)
 
     with col2:
@@ -128,36 +118,25 @@ with tab_predict:
                 <div class='custom-green-tag'>🧠 Kết quả dự đoán</div>
             </div>
         """, unsafe_allow_html=True)
-        
-        # Xử lý sự kiện khi bấm nút
         if chay_mo_hinh:
             if canvas_result.image_data is not None and model is not None:
                 img = cv2.cvtColor(canvas_result.image_data, cv2.COLOR_RGBA2GRAY)
                 
                 if np.any(img < 255): 
-                    # Hiệu ứng loading xoay tròn quét ma trận
                     with st.spinner("🔮 Bạn hãy đợi một xíu sắp có kết quả rồi..."):
-                        time.sleep(0.8) # Tạo độ trễ ảo nhìn cho giống đang tính toán phức tạp
-                        
-                        # Tiền xử lý hình ảnh
+                        time.sleep(0.8)
                         pts = np.argwhere(img < 255)
                         y_min, x_min = pts[:,0].min(), pts[:,1].min()
                         y_max, x_max = pts[:,0].max(), pts[:,1].max()
                         cropped = img[y_min:y_max+1, x_min:x_max+1]
-                        
                         h, w = cropped.shape
                         side = max(h, w) + 40
                         pad = np.ones((side, side), dtype=np.uint8) * 255
                         pad[(side-h)//2:(side-h)//2+h, (side-w)//2:(side-w)//2+w] = cropped
-                        
                         input_img = cv2.resize(pad, (224, 224))
                         input_img_rgb = cv2.cvtColor(input_img, cv2.COLOR_GRAY2RGB)
-                        
-                        # Dự đoán kết quả
                         pred = model.predict(np.expand_dims(input_img_rgb, axis=0), verbose=0)[0]
                         idx = np.argmax(pred)
-                        
-                        # Lưu thông tin vào bộ nhớ Session State
                         st.session_state.max_prob = pred[idx] * 100
                         st.session_state.predicted_class = CLASSES[idx]
                         st.session_state.prediction_data = pd.DataFrame({
@@ -167,8 +146,6 @@ with tab_predict:
                 else:
                     st.session_state.predicted_class = "Empty"
                     st.session_state.prediction_data = None
-
-        # Hiển thị kết quả từ Bộ nhớ (Session State) ra màn hình
         if st.session_state.predicted_class and st.session_state.predicted_class != "Empty":
             st.metric(label="DỰ ĐOÁN HÌNH HỌC", value=st.session_state.predicted_class, delta=f"Độ tin cậy: {st.session_state.max_prob:.2f}%")
             
@@ -182,8 +159,6 @@ with tab_predict:
             st.info("👈 Bảng đang trống! Vui lòng vẽ gì đó trước khi bấm nút phân tích.")
         else:
             st.info("👈 Kéo thả chuột vào bảng trắng để bắt đầu dự đoán!")
-
-# TAB 2: BIỂU ĐỒ XÁC SUẤT
 with tab_analytics:
     st.markdown("### 📊 Mức Độ Tự Tin Của Thuật Toán (Confidence Logic)")
     st.write("Biểu đồ này dự đoán tỉ lệ các loại hình học có thể đúng mà bảng vẽ bạn trình bày.")
@@ -214,8 +189,6 @@ with tab_analytics:
             )
     else:
         st.info("Vui lòng vẽ hình và nhấn nút ở Tab 'Bảng Vẽ' để xem phân tích biểu đồ.")
-
-# TAB 3: TÀI LIỆU
 with tab_research:
     st.markdown("### 💡 Thông tin thuật toán áp dụng lên app")
     st.markdown("""
